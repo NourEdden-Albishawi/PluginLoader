@@ -1,4 +1,16 @@
 name: PluginLoader
-description: A plugin that injects an external plugin into the server without saving it into the disk.
-version: 1.0-BETA
+version: 1.0
 main: me.akraml.loader.plugin.LoaderPlugin
+author: YourName
+api-version: 1.13 # Specify a modern API version
+
+commands:
+  loader:
+    description: Main command for the PluginLoader plugin.
+    usage: /<command> sync
+    permission: pluginloader.command.sync
+
+permissions:
+  pluginloader.command.sync:
+    description: Allows the user to run the sync command.
+    default: op
