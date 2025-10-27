@@ -1,0 +1,12 @@
+# Configuration for the Loader Backend Server
+
+# The port the server will listen on
+port: 5003
+
+# The secret authentication token that clients (LoaderPlugin) must provide
+auth-token: "my-super-secret-key-123"
+
+# The plugin to be served. The server will look for this JAR in the 'injected-plugins' directory.
+plugin:
+  file-name: "loader-injected-plugin-1.0-SNAPSHOT-all.jar"
+  main-class: "me.akraml.loader.plugin.ExampleInjectedPlugin"
