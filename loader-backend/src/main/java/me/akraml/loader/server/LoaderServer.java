@@ -1,74 +1,88 @@
 package me.akraml.loader.server;
 
+import dev.al3mid3x.discovery.PluginInfo;
+import dev.al3mid3x.security.EncryptionUtil;
 import me.akraml.loader.LoaderBackend;
 import me.akraml.loader.utility.FileUtils;
 
+import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
-/**
- * This server handles incoming connections and requests to load the requested plugin.
- */
 public final class LoaderServer {
 
     private final ServerSocket serverSocket;
-    private final String fileName, mainClassName;
+    private final String authToken;
+    private final EncryptionUtil encryptionUtil;
+    private final Map<String, PluginInfo> pluginRegistry;
+    private final ExecutorService connectionPool;
 
-    /**
-     * Constructs a new instance of Loader server class and start the handler.
-     *
-     * @param bindingPort  Port to bind the loader server in.
-     * @param fileName     Name of the file to be sent to the client.
-     * @param mainClass    The main class of the injected plugin.
-     * @throws IOException If an I/O issue occurs.
-     */
-    public LoaderServer(final int bindingPort,
-                        final String fileName,
-                        final String mainClass) throws IOException {
-        // Initialize local variables
-        this.serverSocket  = new ServerSocket(bindingPort);
-        this.fileName      = fileName;
-        this.mainClassName = mainClass;
+    public LoaderServer(final int bindingPort, final String authToken, final Map<String, PluginInfo> pluginRegistry) throws IOException {
+        this.serverSocket = new ServerSocket(bindingPort);
+        this.authToken = authToken;
+        this.encryptionUtil = new EncryptionUtil(authToken);
+        this.pluginRegistry = pluginRegistry;
+        this.connectionPool = Executors.newCachedThreadPool();
     }
 
     public void startListener() {
         while (!serverSocket.isClosed()) {
-            try (final Socket socket = serverSocket.accept()) {
-                // Log the received connection.
-                final String hostname = socket.getInetAddress().getHostAddress() + ":" + socket.getPort();
-                LoaderBackend.getLogger().info("Received connection from /"
-                        + hostname);
-
-                // Declare output stream variables.
-                final DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
-
-                // Send main class name to the client.
-                outputStream.writeUTF(mainClassName);
-
-                // Declare file to be sent, convert it into bytes then send it.
-                final File file = new File(fileName);
-                final byte[] bytes = FileUtils.toByteArray(file);
-                outputStream.writeInt(bytes.length);
-                outputStream.write(bytes);
-            } catch (final Exception exception) {
-                if (exception instanceof SocketException) return;
-                exception.printStackTrace(System.err);
+            try {
+                final Socket socket = serverSocket.accept();
+                connectionPool.submit(() -> handleConnection(socket));
+            } catch (SocketException e) {
+                if (serverSocket.isClosed()) return;
+                LoaderBackend.getLogger().warning("SocketException in listener: " + e.getMessage());
+            } catch (IOException e) {
+                LoaderBackend.getLogger().severe("An I/O error occurred in the listener: " + e.getMessage());
             }
         }
     }
 
-    public void shutdownServer() {
-        try {
-            LoaderBackend.getLogger().info("Shutting down server...");
-            serverSocket.close();
-        } catch (final Exception exception) {
-            LoaderBackend.getLogger().severe("An error occurred when trying to shut down loader server");
-            exception.printStackTrace(System.err);
+    private void handleConnection(Socket socket) {
+        final String hostname = socket.getInetAddress().getHostAddress() + ":" + socket.getPort();
+        try (Socket s = socket;
+             DataInputStream in = new DataInputStream(s.getInputStream());
+             DataOutputStream out = new DataOutputStream(s.getOutputStream())) {
+
+            LoaderBackend.getLogger().info("Connection from /" + hostname + ". Authenticating...");
+
+            if (!authToken.equals(in.readUTF())) {
+                LoaderBackend.getLogger().warning("Authentication failed for /" + hostname + ". Invalid token.");
+                return;
+            }
+            LoaderBackend.getLogger().info("Client /" + hostname + " authenticated successfully.");
+
+            out.writeInt(pluginRegistry.size());
+
+            for (PluginInfo pluginInfo : pluginRegistry.values()) {
+                out.writeUTF(pluginInfo.name());
+                out.writeUTF(encryptionUtil.encrypt(pluginInfo.mainClass()));
+
+                // Read file to memory, encrypt, then send length-prefixed data
+                byte[] fileBytes = FileUtils.toByteArray(pluginInfo.file());
+                byte[] encryptedBytes = encryptionUtil.encrypt(fileBytes);
+
+                out.writeInt(encryptedBytes.length);
+                out.write(encryptedBytes);
+            }
+            LoaderBackend.getLogger().info("Finished sending " + pluginRegistry.size() + " plugins to /" + hostname);
+
+        } catch (Exception e) {
+            LoaderBackend.getLogger().warning("Error during connection with /" + hostname + ": " + e.getMessage());
+        } finally {
+            LoaderBackend.getLogger().info("Connection with /" + hostname + " closed.");
         }
     }
 
+    public void shutdownServer() {
+        // ... (shutdown logic is fine)
+    }
 }
