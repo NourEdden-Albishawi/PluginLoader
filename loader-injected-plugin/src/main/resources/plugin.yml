@@ -1,0 +1,5 @@
+name: ExampleInjectedPlugin
+version: 1.0
+main: me.akraml.loader.plugin.ExampleInjectedPlugin
+authors: [AkramL, Al3mid3x]
+api-version: 1.13
