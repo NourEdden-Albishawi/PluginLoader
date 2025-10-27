@@ -1,3 +1,11 @@
+# Configuration for the Loader Plugin
 loader-server:
-  address: 0.0.0.0
+  # The IP address or hostname of your loader-backend server
+  address: "localhost"
+  
+  # The port your loader-backend server is running on
   port: 5003
+  
+  # The secret authentication token.
+  # This MUST match the token in your loader-backend's config.yml
+  auth-token: "change-this-secret-token"
