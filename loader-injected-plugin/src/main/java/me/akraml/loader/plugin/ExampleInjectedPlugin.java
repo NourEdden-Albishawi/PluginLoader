@@ -1,18 +1,23 @@
 package me.akraml.loader.plugin;
 
+import org.bukkit.plugin.java.JavaPlugin;
+
 /**
- * This plugin is an example to test loader if it's performing well.
+ * This is a standard Spigot plugin used to test the universal plugin loader.
  */
-public final class ExampleInjectedPlugin implements InjectedPlugin {
+public final class ExampleInjectedPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
-        LoaderPlugin.getInstance().getLogger().info("Plugin is now injected!");
+        getLogger().info("===============================================");
+        getLogger().info("ExampleInjectedPlugin has been successfully loaded!");
+        getLogger().info("This plugin was loaded remotely.");
+        getLogger().info("===============================================");
     }
 
     @Override
     public void onDisable() {
-        LoaderPlugin.getInstance().getLogger().info("Plugin is now rejected!");
+        getLogger().info("ExampleInjectedPlugin has been disabled.");
     }
 
 }
